@@ -6,29 +6,32 @@ import { Client } from 'pg';
 const app = express();
 const port = 3000;
 
-const notes: string[] = [];
 
 app.use(methodOverride('_method'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 async function main() {
+  const client = new Client('postgres://postgres:password@localhost:5432/notes')
+  await client.connect()
+
   app.get('/', (req, res) => {
     res.send('Hello World!');
   });
 
   app.get('/notes', async (req, res) => {
-    // renders the notes with a delete button for each note using form delete method action /notes/:index
+
+    const { rows } = await client.query('SELECT * FROM note')
 
     res.send(`
       <h1>Notes</h1>
       <ul>
-        ${notes
+        ${rows
           .map(
             (note, index) => `
-          <form method="POST" action="/notes/${index}?_method=DELETE">
+          <form method="POST" action="/notes/${note.id}?_method=DELETE">
             <li>
-              ${note}
+              ${note.value}
               <button type="submit">X</button>
             </li>
           </form>
@@ -44,12 +47,12 @@ async function main() {
   });
 
   app.post('/notes', async (req, res) => {
-    notes.push(req.body.note);
+    await client.query('INSERT INTO note (value) VALUES ($1)', [req.body.note])
     res.redirect('/notes');
   });
 
   app.delete('/notes/:index', async (req: Request<{ index: number }>, res) => {
-    notes.splice(req.params.index, 1);
+    await client.query('DELETE FROM note WHERE id = $1', [req.params.index])
     res.redirect('/notes');
   });
 
